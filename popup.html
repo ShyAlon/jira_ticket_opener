@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Jira Issue Reporter</title>
+  <style>
+    :root {
+      --bg:        #121212;
+      --card:      #1e1e1e;
+      --text:      #e0e0e0;
+      --field-bg:  #2e2e2e;
+      --border:    #333;
+      --accent:    #29aaff;
+      --btn-bg:    #29aaff;
+      --btn-hover: #007bbd;
+    }
+    html, body {
+      margin: 0;
+      width: 400px;
+      height: auto;
+      font-family: sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .card {
+      background: var(--card);
+      padding: 1rem;
+      margin: 0.5rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    /* 1) NEW: Header is flex so title and cog sit on same line */
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .card-header h2 {
+      margin: 0;
+      color: var(--accent);
+      font-size: 1.25rem;
+    }
+    /* 2) Cog-button styling */
+    #settings {
+      background: none;
+      border: none;
+      padding: 4px;
+      cursor: pointer;
+    }
+    #settings svg {
+      width: 20px;
+      height: 20px;
+      fill: var(--text);
+      transition: fill 0.2s;
+    }
+    #settings:hover svg {
+      fill: var(--accent);
+    }
+
+    .field {
+      margin-bottom: 0.75rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.25rem;
+      font-weight: 500;
+    }
+    textarea {
+      width: 100%;
+      background: var(--field-bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.5rem;
+      color: var(--text);
+      font-size: 0.9rem;
+      resize: vertical;
+      min-height: 120px;
+    }
+    select {
+      width: 100%;
+      background: var(--field-bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.5rem;
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+    .buttons {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    button.submit {
+      flex: 1;
+      padding: 0.6rem;
+      border: none;
+      border-radius: 6px;
+      background: var(--btn-bg);
+      color: #fff;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button.submit:hover {
+      background: var(--btn-hover);
+    }
+    .debug-log {
+      margin-top: 1rem;
+      font-family: monospace;
+      font-size: 0.75rem;
+      line-height: 1.2;
+      background: var(--field-bg);
+      padding: 0.5rem;
+      height: 80px;
+      overflow-y: auto;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <!-- 1) Use a flex container for title + cog: -->
+    <div class="card-header">
+      <h2>Create Jira Issue</h2>
+      <button id="settings" title="Settings">
+        <!-- 2) Inline SVG gear icon: -->
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 8a4 4 0 100 8 4 4 0 000-8zm8.94 5.06l2.02-1.17a0.5 0.5 0 000-0.86l-2.02-1.17a8.012 8.012 0 00-0.6-1.45l1.21-1.79a0.5 0.5 0 00-0.12-0.69l-1.52-1.17a0.5 0.5 0 00-0.7 0.09l-1.21 1.79a7.993 7.993 0 00-1.45-0.6L13.97 2.91a0.5 0.5 0 00-0.5-0.5h-2.92a0.5 0.5 0 00-0.5 0.5l-0.45 2.36a8.037 8.037 0 00-1.45 0.6l-1.21-1.79a0.5 0.5 0 00-0.7-0.09L3.68 4.39a0.5 0.5 0 00-0.12 0.69l1.21 1.79a8.012 8.012 0 00-0.6 1.45L2.15 9.49a0.5 0.5 0 000 0.86l2.02 1.17a8.012 8.012 0 000 2.9l-2.02 1.17a0.5 0.5 0 000 0.86l2.02 1.17c0.17 0.54 0.39 1.05 0.6 1.45l-1.21 1.79a0.5 0.5 0 000.69l1.52 1.17a0.5 0.5 0 000.7l1.21-1.79a8.037 8.037 0 001.45 0.6l0.45 2.36a0.5 0.5 0 000.5h2.92a0.5 0.5 0 000.5l0.45-2.36a8.037 8.037 0 001.45-0.6l1.21 1.79a0.5 0.5 0 000.7l1.52-1.17a0.5 0.5 0 00-.12-0.69l-1.21-1.79c0.21-0.4 0.43-0.91 0.6-1.45l2.02-1.17a0.5 0.5 0 000-0.86l-2.02-1.17a8.012 8.012 0 000-2.9z"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- 3) Description field (large textarea) -->
+    <div class="field">
+      <label for="description">Description (you can edit any of this)</label>
+      <textarea 
+        id="description" 
+        placeholder="<Summary>\n\n(Here will appear generated bullets and logs…)" 
+        rows="10">
+      </textarea>
+    </div>
+
+    <div class="field">
+      <label for="priority">Priority</label>
+      <select id="priority">
+        <option>Loading…</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="affectedSystem">Affected System</label>
+      <select id="affectedSystem">
+        <option>Loading…</option>
+      </select>
+    </div>
+
+    <div class="buttons">
+      <button id="submit" class="submit">Submit</button>
+      <!-- 4) We’ve removed the old “Settings” button here,
+            since it’s now the small cog at the top -->
+    </div>
+
+    <div id="debug" class="debug-log">
+      <strong>Debug Log:</strong><br>
+    </div>
+  </div>
+
+  <script type="module" src="popup.mjs"></script>
+</body>
+</html>

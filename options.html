@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Jira Settings</title>
+  <style>
+    :root {
+      --bg-color: #121212;
+      --card-bg: #1e1e1e;
+      --text-color: #e0e0e0;
+      --input-bg: #2e2e2e;
+      --input-border: #444;
+      --accent: #007acc;
+      --button-bg: #007acc;
+      --button-hover-bg: #005a9e;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .container {
+      background: var(--card-bg);
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+      width: 100%;
+      max-width: 400px;
+    }
+    h1 {
+      margin-top: 0;
+      margin-bottom: 1.5rem;
+      font-size: 1.5rem;
+      text-align: center;
+      color: var(--accent);
+    }
+    .field {
+      margin-bottom: 1rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+    }
+    input {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid var(--input-border);
+      background: var(--input-bg);
+      color: var(--text-color);
+      border-radius: 4px;
+    }
+    button {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--button-bg);
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: var(--button-hover-bg);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Jira Settings</h1>
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" type="email" placeholder="you@example.com">
+    </div>
+    <div class="field">
+      <label for="token">API Token</label>
+      <input id="token" type="password" placeholder="********">
+    </div>
+    <div class="field">
+      <label for="host">Host (e.g. yourdomain.atlassian.net)</label>
+      <input id="host" type="text" placeholder="yourdomain.atlassian.net">
+    </div>
+    <div class="field">
+      <label for="projectKey">Default Project Key</label>
+      <input id="projectKey" type="text" placeholder="MYPROJ">
+    </div>
+    <button id="save">Save Settings</button>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>
