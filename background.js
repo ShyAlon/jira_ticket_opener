@@ -1,4 +1,4 @@
-// background.js  [oai_citation:1‡background.js](file-service://file-HSPzTc9ViBbnSfBAJWcqQv)
+// background.js
 
 console.log('[Background] Service worker loaded');
 
@@ -10,7 +10,7 @@ console.log('[Background] Service worker loaded');
  *   3) Capture a screenshot (PNG) from that tab’s window
  *   4) Download the PNG for debugging
  *   5) Request console logs from content_script.js (if present)
- *   6) Store { url, screenshot, logs } in chrome.storage.local
+ *   6) Store { url, screenshot, logs, tabId } in chrome.storage.local
  *   7) Open popup.html in a new tab
  */
 chrome.action.onClicked.addListener((tab) => {
@@ -68,7 +68,7 @@ function attemptCapture(tab) {
 
 /**
  * Capture the visible tab, download for debugging, request logs,
- * store issueData, and open popup.html.
+ * store issueData (including tabId), and open popup.html.
  */
 function doCapture(tab) {
   chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' }, (dataUrl) => {
@@ -114,11 +114,12 @@ function doCapture(tab) {
       }
       console.log('[Background] Console logs received:', logs);
 
-      // 4) Store issueData (url, screenshot, logs) in local storage
+      // 4) Store issueData (url, screenshot, logs, tabId) in local storage
       const issueData = {
         url:        tab.url,
         screenshot: dataUrl,
-        logs:       logs
+        logs:       logs,
+        tabId:      tab.id
       };
       chrome.storage.local.set({ issueData }, () => {
         if (chrome.runtime.lastError) {

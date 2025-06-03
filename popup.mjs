@@ -1,8 +1,6 @@
-// popup.mjs  [oai_citation:0‡popup.mjs](file-service://file-Pm4dg4gAsMGX1sRTiHEahc)
+// popup.mjs
 
 import { debug } from './debug.mjs';
-import { sysFieldKey } from './metadata.mjs';
-import { fetchVersionsFromPage } from './versions.mjs';
 import { createJiraIssue } from './issue.mjs';
 
 console.log('[Popup] popup.mjs loaded');
@@ -15,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function initPopup() {
   debug('[Popup] initPopup()');
 
-  // 1) Load stored issueData (for logs, screenshot, and original URL)
+  // 1) Load stored issueData (for logs, screenshot, original URL, and tabId)
   let issueData = null;
   await new Promise((resolve) => {
     chrome.storage.local.get('issueData', ({ issueData: d }) => {
@@ -24,15 +22,16 @@ async function initPopup() {
         debug('[Popup] No issueData in storage');
       } else {
         debug('[Popup] issueData loaded', {
-          url: issueData.url,
-          logsCount: issueData.logs.length
+          url:       issueData.url,
+          logsCount: issueData.logs.length,
+          tabId:     issueData.tabId
         });
       }
       resolve();
     });
   });
 
-  // 2) Display the captured screenshot thumbnail (max‐height: 256px).
+  // 2) Display the captured screenshot thumbnail (max-height: 256px).
   const screenshotEl = document.getElementById('screenshot');
   if (issueData && issueData.screenshot) {
     screenshotEl.src = issueData.screenshot;
@@ -47,20 +46,33 @@ async function initPopup() {
   const currentTabUrl = issueData ? issueData.url : '';
   debug('[Popup] Using stored original URL:', currentTabUrl);
 
-  // 4) Fetch FE/BE versions from the original tab (if not an extension page)
+  // 4) Fetch FE/BE versions from the original tab via scripting (if possible)
   let feVersion = '', beVersion = '';
-  if (currentTabUrl && !currentTabUrl.startsWith('chrome-extension://')) {
+  if (issueData && typeof issueData.tabId === 'number') {
     try {
-      // execute script in the original tab to scrape FE/BE
-      const versions = await fetchVersionsFromPage();
+      // Execute script in the original tab (issueData.tabId)
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId: issueData.tabId },
+        func: () => {
+          const nodes = Array.from(document.querySelectorAll('p.--technology-version'));
+          let fe = '', be = '';
+          for (const p of nodes) {
+            const text = p.textContent || '';
+            if (text.startsWith('FE:')) fe = text.replace(/^FE:\s*/, '').trim();
+            if (text.startsWith('BE:')) be = text.replace(/^BE:\s*/, '').trim();
+          }
+          return { feVersion: fe, beVersion: be };
+        }
+      });
+      const versions = result.result || {};
       feVersion = versions.feVersion;
       beVersion = versions.beVersion;
       debug('[Popup] Versions from original page:', versions);
     } catch (err) {
-      console.error('[Popup] Error fetching versions:', err);
+      console.error('[Popup] Error fetching versions via scripting:', err);
     }
   } else {
-    debug('[Popup] Skipping version fetch: no valid original URL');
+    debug('[Popup] Skipping version fetch: no valid tabId');
   }
 
   // 5) Compute environment (hostname) from that original URL
@@ -77,7 +89,7 @@ async function initPopup() {
   descEl.value = generateDescription({
     currentTabUrl,
     issueData,
-    versions: { feVersion, beVersion },
+    versions:   { feVersion, beVersion },
     environment
   });
 
@@ -136,10 +148,10 @@ function populateDropdowns(meta) {
     return;
   }
 
-  // The fields object contains priority and our custom sysFieldKey
+  // The fields object contains priority and possibly “Affected System”
   const fields = issuetype.fields || {};
 
-  // 1) Priority dropdown
+  // 1) Populate Priority dropdown
   const priorityEl = document.getElementById('priority');
   priorityEl.innerHTML = ''; // clear existing
   const priorityField = fields.priority;
@@ -147,7 +159,7 @@ function populateDropdowns(meta) {
     priorityField.allowedValues.forEach((p) => {
       const opt = document.createElement('option');
       opt.textContent = p.name;
-      opt.value = p.id;
+      opt.value       = p.id;
       priorityEl.appendChild(opt);
     });
     // Default “Medium”
@@ -161,25 +173,38 @@ function populateDropdowns(meta) {
     // fallback
     const opt = document.createElement('option');
     opt.textContent = 'Default';
-    opt.value = '';
+    opt.value       = '';
     priorityEl.appendChild(opt);
   }
 
-  // 2) Affected System dropdown (custom field)
+  // 2) Populate Affected System dropdown by looking for a field whose name is exactly "Affected System"
   const systemEl = document.getElementById('affectedSystem');
   systemEl.innerHTML = ''; // clear existing
-  const sysField = fields[sysFieldKey];
-  if (sysField && Array.isArray(sysField.allowedValues)) {
-    sysField.allowedValues.forEach((s) => {
-      const opt = document.createElement('option');
-      opt.textContent = s.name || s.value;
-      opt.value = s.id;
-      systemEl.appendChild(opt);
-    });
-  } else {
+
+  // Find the field key where fields[fieldKey].name === "Affected System"
+  const affectedKey = Object.keys(fields).find((fieldKey) => {
+    const fld = fields[fieldKey];
+    return fld && fld.name === 'Affected System';
+  });
+
+  if (affectedKey) {
+    const sysField = fields[affectedKey];
+    if (sysField.allowedValues && Array.isArray(sysField.allowedValues)) {
+      sysField.allowedValues.forEach((s) => {
+        const opt = document.createElement('option');
+        // Some Jira setups use s.name, others s.value
+        opt.textContent = s.name || s.value;
+        opt.value       = s.id;
+        systemEl.appendChild(opt);
+      });
+    }
+  }
+
+  // If we found nothing or no allowedValues, default to “None”
+  if (systemEl.options.length === 0) {
     const opt = document.createElement('option');
     opt.textContent = 'None';
-    opt.value = '';
+    opt.value       = '';
     systemEl.appendChild(opt);
   }
 
@@ -200,10 +225,10 @@ function generateDescription({ currentTabUrl, issueData, versions, environment }
   const { feVersion, beVersion } = versions || {};
 
   const bullets = [
-    feVersion ? `* FE Version: ${feVersion}` : null,
-    beVersion ? `* BE Version: ${beVersion}` : null,
-    environment ? `* Environment: ${environment}` : null,
-    currentTabUrl ? `* URL: ${currentTabUrl}` : null
+    feVersion    ? `* FE Version: ${feVersion}`     : null,
+    beVersion    ? `* BE Version: ${beVersion}`     : null,
+    environment  ? `* Environment: ${environment}`  : null,
+    currentTabUrl? `* URL: ${currentTabUrl}`        : null
   ]
     .filter(Boolean)
     .join('\n');
@@ -226,7 +251,7 @@ async function onSubmitClick() {
   debug('[Popup] Submit clicked');
 
   const summaryEl = document.getElementById('summary');
-  const descEl = document.getElementById('description');
+  const descEl    = document.getElementById('description');
 
   const userSummary = summaryEl.value.trim();
   if (!userSummary) {
