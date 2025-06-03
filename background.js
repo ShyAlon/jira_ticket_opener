@@ -167,6 +167,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 /**
  * Perform the Jira API call to fetch create-meta for the given project & issue type.
  * This runs in the background service-worker (no CORS issues, since we’ve granted host_permissions).
+ * We also compute and persist sysFieldKey.
  */
 async function loadMetadataInBackground() {
   // 1) Load Jira credentials and settings from sync storage
@@ -187,13 +188,13 @@ async function loadMetadataInBackground() {
     throw new Error('Missing Jira credentials or projectKey in storage');
   }
 
+  // 2) Build and send the create-meta request
   const auth = btoa(`${jiraEmail}:${jiraApiToken}`);
   const url = `https://${jiraHost}/rest/api/2/issue/createmeta`
     + `?projectKeys=${encodeURIComponent(projectKey)}`
     + `&issuetypeNames=Bug&expand=projects.issuetypes.fields`;
 
   console.log('[Background] fetch create-meta from Jira:', url);
-
   const resp = await fetch(url, {
     method: 'GET',
     headers: {
@@ -209,5 +210,48 @@ async function loadMetadataInBackground() {
 
   const json = await resp.json();
   console.log('[Background] create-meta response received');
+
+  // 3) From the JSON, determine the correct sysFieldKey for “Affected System”
+  //    (Case‐insensitive match on fld.name === "Affected System")
+  let computedSysFieldKey = '';
+  try {
+    const projectMeta = json.projects[0];
+    const issuetypeObj = projectMeta.issuetypes.find((it) => it.name === 'Bug');
+    const fields = issuetypeObj.fields || {};
+    computedSysFieldKey = Object.keys(fields).find((fldKey) => {
+      const fld = fields[fldKey];
+      return (
+        fld &&
+        typeof fld.name === 'string' &&
+        fld.name.trim().toLowerCase() === 'affected system'
+      );
+    }) || '';
+  } catch (e) {
+    console.warn('[Background] Could not compute sysFieldKey:', e);
+  }
+
+  console.debug('[Background] Computed sysFieldKey =', computedSysFieldKey);
+
+  // 4) Persist sysFieldKey in chrome.storage.sync so issue.mjs / metadata.mjs can retrieve it
+  if (computedSysFieldKey) {
+    chrome.storage.sync.set({ sysFieldKey: computedSysFieldKey }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[Background] Error saving sysFieldKey:', chrome.runtime.lastError);
+      } else {
+        console.log('[Background] sysFieldKey saved:', computedSysFieldKey);
+      }
+    });
+  } else {
+    // If none found, still clear it out in storage
+    chrome.storage.sync.set({ sysFieldKey: '' }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[Background] Error clearing sysFieldKey:', chrome.runtime.lastError);
+      } else {
+        console.log('[Background] sysFieldKey cleared');
+      }
+    });
+  }
+
+  // 5) Return the raw create-meta JSON to the popup
   return json;
 }

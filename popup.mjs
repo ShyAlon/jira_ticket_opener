@@ -50,7 +50,6 @@ async function initPopup() {
   let feVersion = '', beVersion = '';
   if (issueData && typeof issueData.tabId === 'number') {
     try {
-      // Execute script in the original tab (issueData.tabId)
       const [result] = await chrome.scripting.executeScript({
         target: { tabId: issueData.tabId },
         func: () => {
@@ -162,12 +161,10 @@ function populateDropdowns(meta) {
       opt.value       = p.id;
       priorityEl.appendChild(opt);
     });
-    // Default “Medium”
-    for (let i = 0; i < priorityEl.options.length; i++) {
-      if (priorityEl.options[i].text === 'Medium') {
-        priorityEl.selectedIndex = i;
-        break;
-      }
+    // Default to “Medium” if present
+    const mediumOption = Array.from(priorityEl.options).find((o) => o.text.toLowerCase() === 'medium');
+    if (mediumOption) {
+      priorityEl.value = mediumOption.value;
     }
   } else {
     // fallback
@@ -177,35 +174,34 @@ function populateDropdowns(meta) {
     priorityEl.appendChild(opt);
   }
 
-  // 2) Populate Affected System dropdown by looking for a field whose name is exactly "Affected System"
+  // 2) Populate Affected System dropdown by looking for a field
+  //    whose name matches “Affected System” (case-insensitive)
   const systemEl = document.getElementById('affectedSystem');
   systemEl.innerHTML = ''; // clear existing
 
-  // Find the field key where fields[fieldKey].name === "Affected System"
   const affectedKey = Object.keys(fields).find((fieldKey) => {
     const fld = fields[fieldKey];
-    return fld && fld.name === 'Affected System';
+    return (
+      fld &&
+      typeof fld.name === 'string' &&
+      fld.name.trim().toLowerCase() === 'affected system'
+    );
   });
 
   if (affectedKey) {
-    const sysField = fields[affectedKey];
-    if (sysField.allowedValues && Array.isArray(sysField.allowedValues)) {
-      sysField.allowedValues.forEach((s) => {
-        const opt = document.createElement('option');
-        // Some Jira setups use s.name, others s.value
-        opt.textContent = s.name || s.value;
-        opt.value       = s.id;
-        systemEl.appendChild(opt);
+    const sysAllowed = fields[affectedKey]?.allowedValues || [];
+    if (sysAllowed.length) {
+      sysAllowed.forEach((s) => {
+        const label = s.name || s.value || '';
+        const opt = new Option(label, s.id);
+        systemEl.add(opt);
       });
     }
   }
 
-  // If we found nothing or no allowedValues, default to “None”
-  if (systemEl.options.length === 0) {
-    const opt = document.createElement('option');
-    opt.textContent = 'None';
-    opt.value       = '';
-    systemEl.appendChild(opt);
+  // If no real Affected System values, add a single “None” option
+  if (!systemEl.options.length) {
+    systemEl.add(new Option('None', ''));
   }
 
   debug('[Popup] Dropdowns populated: priority & affectedSystem');
@@ -244,25 +240,27 @@ function generateDescription({ currentTabUrl, issueData, versions, environment }
 
 /**
  * When “Submit” is clicked:
- *  - Read the summary and description fields
- *  - Call createJiraIssue(summary, description)
+ *  - Read the summary, description, and affectedSystem fields
+ *  - Call createJiraIssue(summary, description, affectedSystemId)
  */
 async function onSubmitClick() {
   debug('[Popup] Submit clicked');
 
-  const summaryEl = document.getElementById('summary');
-  const descEl    = document.getElementById('description');
+  const summaryEl       = document.getElementById('summary');
+  const descEl          = document.getElementById('description');
+  const affectedSelect  = document.getElementById('affectedSystem');
 
-  const userSummary = summaryEl.value.trim();
+  const userSummary      = summaryEl.value.trim();
+  const fullDescription  = descEl.value.trim();
+  const affectedSystemId = affectedSelect.value;
+
   if (!userSummary) {
     alert('❗ Please enter a one-line Summary before submitting.');
     return;
   }
 
-  const fullDescription = descEl.value.trim();
-
   try {
-    await createJiraIssue(userSummary, fullDescription);
+    await createJiraIssue(userSummary, fullDescription, affectedSystemId);
   } catch (err) {
     console.error('[Popup] Error in createJiraIssue:', err);
   }

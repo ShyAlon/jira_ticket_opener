@@ -1,33 +1,54 @@
 // issue.mjs
 
 import { debug } from './debug.mjs';
-import { sysFieldKey } from './metadata.mjs';
+// We no longer import a raw sysFieldKey. Instead, import the async getter:
+import { getSysFieldKey } from './metadata.mjs';
 
 /**
  * Creates a Jira issue in three steps:
  *   1) Create the issue (summary, project, issueType, priority, affectedSystem)
  *   2) Update the description field (bullets + logs)
  *   3) Attach the screenshot
- * 
+ *
  * Finally, prompt the user via confirm(...) to open the ticket in a new tab.
  *
- * @param {string} userSummary   – one‐line summary from popup’s #summary
- * @param {string} fullBodyDesc  – the multi‐line description (bullets + logs) from #description
+ * @param {string} userSummary        – One‐line summary from popup’s #summary
+ * @param {string} fullBodyDesc       – The multi‐line description (bullets + logs) from #description
+ * @param {string} affectedSystemId   – The ID of the selected “Affected System” from the popup
  */
-export async function createJiraIssue(userSummary, fullBodyDesc) {
-  debug('Starting three‐step createJiraIssue()…');
+export async function createJiraIssue(userSummary, fullBodyDesc, affectedSystemId) {
+  // 0) First, retrieve the stored sysFieldKey from metadata storage
+  const sysFieldKey = await getSysFieldKey();
+  debug('Resolved sysFieldKey =', sysFieldKey);
+
+  debug('Starting three‐step createJiraIssue()…', {
+    userSummary,
+    affectedSystemId,
+    sysFieldKey
+  });
 
   // 1) Load Jira credentials & settings
   const {
-    jiraEmail,
-    jiraApiToken,
-    jiraHost,
+    email,
+    token,
+    host,
     projectKey = 'MYPROJ',
-    issueType = 'Bug'
+    issueType  = 'Bug'
   } = await chrome.storage.sync.get([
-    'jiraEmail', 'jiraApiToken', 'jiraHost', 'projectKey', 'issueType'
+    'email',       // Atlassian user email
+    'token',       // Atlassian API token
+    'host',        // e.g. "qbiq.atlassian.net"
+    'projectKey',  // e.g. "QBIQ"
+    'issueType'    // typically "Bug"
   ]);
-  const auth = btoa(`${jiraEmail}:${jiraApiToken}`);
+
+  if (!email || !token || !host || !projectKey) {
+    alert('❌ Missing Jira credentials or projectKey in storage.');
+    return;
+  }
+
+  const auth = btoa(`${email}:${token}`);
+  const baseUrl = `https://${host}/rest/api/2/issue`;
 
   // 2) Ensure we have a summary
   if (!userSummary) {
@@ -35,9 +56,14 @@ export async function createJiraIssue(userSummary, fullBodyDesc) {
     return;
   }
 
-  // 3) Read Priority and Affected System from the popup
-  const priorityId = document.getElementById('priority').value;
-  const systemFieldId = document.getElementById('affectedSystem').value;
+  // 3) Read Priority from the popup’s <select id="priority">
+  const priorityId = document.getElementById('priority').value || '';
+
+  // 4) Validate that Affected System was passed in
+  if (!affectedSystemId) {
+    alert('❌ Couldn’t create issue: AFFECTED SYSTEM is empty, please select a system in which the bug occurs');
+    return;
+  }
 
   // ────────────────────────────────────────────────────────────────────────────────
   // STEP 1: Create the issue with minimal fields (no description yet)
@@ -45,21 +71,27 @@ export async function createJiraIssue(userSummary, fullBodyDesc) {
   debug('STEP 1: POST /issue → creating issue without description');
   const createBody = {
     fields: {
-      project: { key: projectKey },
-      summary: userSummary,
+      project:   { key: projectKey },
+      summary:   userSummary,
       issuetype: { name: issueType },
+
+      // Add priority if selected
       ...(priorityId && { priority: { id: priorityId } }),
-      ...(systemFieldId && sysFieldKey && { [sysFieldKey]: { id: systemFieldId } })
+
+      // Add Affected System if we have both a key and ID
+      ...(sysFieldKey && affectedSystemId && { [sysFieldKey]: { id: affectedSystemId } })
     }
   };
 
+  console.debug('[Issue] createBody.fields =', createBody.fields);
+
   let createResp;
   try {
-    createResp = await fetch(`https://${jiraHost}/rest/api/2/issue`, {
+    createResp = await fetch(baseUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json'
+        'Content-Type':  'application/json'
       },
       body: JSON.stringify(createBody)
     });
@@ -80,21 +112,21 @@ export async function createJiraIssue(userSummary, fullBodyDesc) {
 
   debug('Step 1 create response', createResult);
   if (!createResp.ok || !createResult.key) {
-    const errMsg = createResult.errorMessages || JSON.stringify(createResult);
+    const errMsg = (createResult.errorMessages || []).join(', ') || JSON.stringify(createResult);
     alert(`❌ Couldn’t create issue: ${errMsg}`);
     debug('STEP 1 failed', createResult);
     return;
   }
 
-  // Extract the new issue key
+  // Extract the new issue key and its browse URL
   const issueKey = createResult.key;
-  const issueUrl = `https://${jiraHost}/browse/${issueKey}`;
+  const issueUrl = `https://${host}/browse/${issueKey}`;
   debug('STEP 1 successful, issueKey:', issueKey);
 
   // ────────────────────────────────────────────────────────────────────────────────
   // STEP 2: Update the description field of that new issue
   // ────────────────────────────────────────────────────────────────────────────────
-  debug('STEP 2: PUT /issue/' + issueKey + ' → updating description');
+  debug(`STEP 2: PUT /issue/${issueKey} → updating description`);
   const updateBody = {
     fields: {
       description: fullBodyDesc
@@ -103,53 +135,45 @@ export async function createJiraIssue(userSummary, fullBodyDesc) {
 
   let updateResp;
   try {
-    updateResp = await fetch(
-      `https://${jiraHost}/rest/api/2/issue/${issueKey}`, {
+    updateResp = await fetch(`${baseUrl}/${issueKey}`, {
       method: 'PUT',
       headers: {
         'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json'
+        'Content-Type':  'application/json'
       },
       body: JSON.stringify(updateBody)
-    }
-    );
+    });
   } catch (err) {
     debug('Network error on step 2 (update description)', err);
     alert(`Issue ${issueKey} created, but network error updating description.`);
-    // We can still proceed to step 3 (attach icon/screenshot)
+    // Continue to step 3 anyway
   }
 
   if (updateResp && !updateResp.ok) {
     const text = await updateResp.text();
     debug('STEP 2 failed', text);
     alert(`Issue ${issueKey} created, but failed to update description: ${text}`);
-    // Still continue to step 3
+    // Continue to step 3
   } else {
     debug('STEP 2 successful: description updated for', issueKey);
   }
 
-  // issue.mjs, RIGHT AFTER updating description (Step 2)
-
+  // (Optional debug: fetch back the description for verification)
   if (updateResp && updateResp.ok) {
-    // Fetch the issue back from Jira, asking only for the description field
     try {
       const getResp = await fetch(
-        `https://${jiraHost}/rest/api/2/issue/${issueKey}?fields=description`, {
+        `https://${host}/rest/api/2/issue/${issueKey}?fields=description`, {
         method: 'GET',
         headers: {
           'Authorization': `Basic ${auth}`,
-          'Accept': 'application/json'
+          'Accept':        'application/json'
         }
-      }
-      );
-
+      });
       if (!getResp.ok) {
         console.warn('[Issue] Could not GET issue to verify description:', getResp.status, getResp.statusText);
       } else {
         const getJson = await getResp.json();
         console.log('[Issue] Fetched description from Jira:', getJson.fields.description);
-        // Optionally, alert so you can see it:
-        // alert('DEBUG: Jira stored description:\n\n' + getJson.fields.description);
       }
     } catch (e) {
       console.error('[Issue] Error fetching issue description for debug:', e);
@@ -157,11 +181,10 @@ export async function createJiraIssue(userSummary, fullBodyDesc) {
   }
 
   // ────────────────────────────────────────────────────────────────────────────────
-  // STEP 3: Upload the screenshot (here, we assume screenshot already in storage)
+  // STEP 3: Upload the screenshot (if present)
   // ────────────────────────────────────────────────────────────────────────────────
   debug('STEP 3: Uploading screenshot for', issueKey);
 
-  // 3A) Retrieve the stored screenshot dataURL from local storage
   const { issueData } = await chrome.storage.local.get(['issueData']);
   if (!issueData || !issueData.screenshot) {
     debug('No screenshot found in storage for issue', issueKey);
@@ -174,15 +197,14 @@ export async function createJiraIssue(userSummary, fullBodyDesc) {
       form.append('file', blob, 'screenshot.png');
 
       const attachResp = await fetch(
-        `https://${jiraHost}/rest/api/2/issue/${issueKey}/attachments`, {
+        `https://${host}/rest/api/2/issue/${issueKey}/attachments`, {
         method: 'POST',
         headers: {
-          'Authorization': `Basic ${auth}`,
+          'Authorization':     `Basic ${auth}`,
           'X-Atlassian-Token': 'no-check'
         },
         body: form
-      }
-      );
+      });
 
       if (!attachResp.ok) {
         const text = await attachResp.text();
@@ -190,7 +212,6 @@ export async function createJiraIssue(userSummary, fullBodyDesc) {
         alert(`Issue ${issueKey} created, but failed to attach screenshot: ${text}`);
       } else {
         debug('STEP 3 successful: screenshot attached for', issueKey);
-        // Final confirmation below
       }
     } catch (err) {
       debug('Error during screenshot attachment in step 3', err);
@@ -206,7 +227,6 @@ export async function createJiraIssue(userSummary, fullBodyDesc) {
     `👉 Click “OK” to open: ${issueUrl}`
   );
   if (openNow) {
-    // In a popup context, window.open will open in a new tab
     window.open(issueUrl, '_blank');
   }
 }
