@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>Jira Settings</title>
@@ -14,9 +15,11 @@
       --button-bg: #007acc;
       --button-hover-bg: #005a9e;
     }
+
     * {
       box-sizing: border-box;
     }
+
     body {
       margin: 0;
       font-family: sans-serif;
@@ -27,14 +30,16 @@
       justify-content: center;
       min-height: 100vh;
     }
+
     .container {
       background: var(--card-bg);
       padding: 2rem;
       border-radius: 12px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
       width: 100%;
       max-width: 400px;
     }
+
     h1 {
       margin-top: 0;
       margin-bottom: 1.5rem;
@@ -42,14 +47,17 @@
       text-align: center;
       color: var(--accent);
     }
+
     .field {
       margin-bottom: 1rem;
     }
+
     label {
       display: block;
       margin-bottom: 0.5rem;
       font-weight: 500;
     }
+
     input {
       width: 100%;
       padding: 0.5rem;
@@ -58,6 +66,7 @@
       color: var(--text-color);
       border-radius: 4px;
     }
+
     button {
       width: 100%;
       padding: 0.75rem;
@@ -69,11 +78,13 @@
       cursor: pointer;
       transition: background 0.2s;
     }
+
     button:hover {
       background: var(--button-hover-bg);
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <h1>Jira Settings</h1>
@@ -93,8 +104,34 @@
       <label for="projectKey">Default Project Key</label>
       <input id="projectKey" type="text" placeholder="MYPROJ">
     </div>
+    <h2 style="margin-top:1.5rem; font-size:1.2rem; color:var(--accent)">Version Detection</h2>
+
+    <div class="field">
+      <label for="versionSelector">Version Element Selector</label>
+      <input id="versionSelector" type="text" placeholder="e.g. p.--technology-version">
+      <small style="color: #888; font-size: 0.8rem;">
+        CSS selector for elements containing “FE:”/“BE:” text.
+      </small>
+    </div>
+
+    <div class="field">
+      <label for="fePrefix">FE Prefix</label>
+      <input id="fePrefix" type="text" placeholder="FE:">
+      <small style="color: #888; font-size: 0.8rem;">
+        The text prefix that marks frontend version (e.g. “FE:”).
+      </small>
+    </div>
+
+    <div class="field">
+      <label for="bePrefix">BE Prefix</label>
+      <input id="bePrefix" type="text" placeholder="BE:">
+      <small style="color: #888; font-size: 0.8rem;">
+        The text prefix that marks backend version (e.g. “BE:”).
+      </small>
+    </div>
     <button id="save">Save Settings</button>
   </div>
   <script src="options.js"></script>
 </body>
+
 </html>

@@ -46,6 +46,7 @@ export async function loadMetadata() {
     prioSel.add(new Option('No priorities found', ''));
   } else {
     priorityAllowed.forEach(p => prioSel.add(new Option(p.name, p.id)));
+    prioSel.selectedIndex = 2;
   }
 
   // — Populate Affected System:
