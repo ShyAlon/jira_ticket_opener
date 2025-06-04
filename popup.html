@@ -1,20 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <title>Jira Issue Reporter</title>
   <style>
     :root {
-      --bg:        #121212;
-      --card:      #1e1e1e;
-      --text:      #e0e0e0;
-      --field-bg:  #2e2e2e;
-      --border:    #333;
-      --accent:    #29aaff;
-      --btn-bg:    #29aaff;
+      --bg: #121212;
+      --card: #1e1e1e;
+      --text: #e0e0e0;
+      --field-bg: #2e2e2e;
+      --border: #333;
+      --accent: #29aaff;
+      --btn-bg: #29aaff;
       --btn-hover: #007bbd;
     }
-    html, body {
+
+    html,
+    body {
       margin: 0;
       padding: 0;
       width: 100%;
@@ -22,13 +25,13 @@
       font-family: sans-serif;
       background: var(--bg);
       color: var(--text);
-      overflow: auto;
     }
+
     .container {
       background: var(--card);
       padding: 1.5rem;
       border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
       width: 600px;
       max-width: 90%;
       margin: 1rem auto;
@@ -36,18 +39,20 @@
       grid-template-columns: 1fr;
       grid-gap: 1rem;
       max-height: calc(100vh - 2rem);
-      overflow-y: auto;
     }
+
     .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
+
     h2 {
       margin: 0;
       color: var(--accent);
       font-size: 1.5rem;
     }
+
     .settings-btn {
       background: none;
       border: none;
@@ -56,9 +61,11 @@
       cursor: pointer;
       padding: 0;
     }
+
     .settings-btn:hover {
       color: var(--accent);
     }
+
     .screenshot-container {
       display: flex;
       justify-content: center;
@@ -68,23 +75,28 @@
       border-radius: 4px;
       padding: 0.5rem;
       max-height: 256px;
-      overflow: hidden;
     }
+
     .screenshot-container img {
       max-height: 256px;
       width: auto;
       cursor: pointer;
       border-radius: 4px;
     }
+
     .field {
       margin-bottom: 0.75rem;
     }
+
     label {
       display: block;
       margin-bottom: 0.25rem;
       font-weight: 500;
     }
-    input[type="text"], select, textarea {
+
+    input[type="text"],
+    select,
+    textarea {
       width: 100%;
       background: var(--field-bg);
       border: 1px solid var(--border);
@@ -93,19 +105,23 @@
       color: var(--text);
       font-size: 0.9rem;
     }
+
     input[type="text"] {
       height: 2rem;
     }
+
     textarea {
       resize: vertical;
       min-height: 120px;
     }
+
     .buttons {
       display: flex;
       justify-content: space-between;
       gap: 0.5rem;
       margin-top: 0.5rem;
     }
+
     button.submit {
       flex: 1;
       padding: 0.6rem;
@@ -117,9 +133,11 @@
       cursor: pointer;
       transition: background 0.2s;
     }
+
     button.submit:hover {
       background: var(--btn-hover);
     }
+
     .debug-log {
       font-family: monospace;
       font-size: 0.75rem;
@@ -127,12 +145,12 @@
       background: var(--field-bg);
       padding: 0.5rem;
       height: 80px;
-      overflow-y: auto;
       border-radius: 4px;
       border: 1px solid var(--border);
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <div class="header">
@@ -157,19 +175,8 @@
       <textarea id="description" rows="6"></textarea>
     </div>
 
-    <div class="field">
-      <label for="priority">Priority</label>
-      <select id="priority">
-        <option>Loading…</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label for="affectedSystem">Affected System</label>
-      <select id="affectedSystem">
-        <option>Loading…</option>
-      </select>
-    </div>
+    <!-- ===== DYNAMIC META FIELDS HERE ===== -->
+    <div id="meta-fields"></div>
 
     <div class="buttons">
       <button id="submit" class="submit">Submit</button>
@@ -182,4 +189,5 @@
 
   <script type="module" src="popup.mjs"></script>
 </body>
+
 </html>
