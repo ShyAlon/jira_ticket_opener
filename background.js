@@ -166,7 +166,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 async function loadMetadataInBackground() {
   // (1) Read email/token/host/projectKey exactly as you already do
-  const { email, token, host, projectKey = 'QBIQ' } =
+  const { email, token, host, projectKey } =
     await chrome.storage.sync.get(['email', 'token', 'host', 'projectKey']);
   if (!email || !token || !host || !projectKey) {
     throw new Error('Missing Jira credentials or projectKey in storage');

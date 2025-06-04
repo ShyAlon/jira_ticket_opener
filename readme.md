@@ -153,7 +153,6 @@ Each dropdown is built at runtime from Jira’s metadata. If the field’s `sche
 ├── content_script.js  ← Injected into every page: collects console logs on demand
 ├── debug.mjs          ← Simple helper for console debug logging
 ├── issue.mjs          ← Issues the 3-step Jira API calls (create, update desc, attach image)
-├── metadata.mjs       ← (Deprecated) Static metadata logic was moved to background.js
 ├── options.html       ← Settings page UI (Jira credentials, project key, issue type)
 ├── options.js         ← Saves options to chrome.storage.sync
 ├── popup.html         ← Main popup UI (canvas, summary, description, dynamic picks)
