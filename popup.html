@@ -5,6 +5,7 @@
   <meta charset="utf-8" />
   <title>Jira Issue Reporter</title>
   <style>
+    /* ── COLOR VARIABLES ───────────────────────────────────────────────────── */
     :root {
       --bg: #121212;
       --card: #1e1e1e;
@@ -16,41 +17,46 @@
       --btn-hover: #007bbd;
     }
 
+    /* ── HTML & BODY: auto‐size, allow scrolling if needed ──────────────────── */
     html,
     body {
       margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      font-family: sans-serif;
+      padding: 50px;
       background: var(--bg);
       color: var(--text);
+      font-family: sans-serif;
+      box-sizing: border-box;
+
+      /* Let Chrome size the popup to its content, but scroll if it exceeds viewport */
+      min-width: 300px;
+      max-width: 100%;
+      width: max-content;
+      /* If content taller than viewport, enable scroll */
+      overflow-y: auto;
     }
 
+    /* ── OUTER CONTAINER: fill full width of popup ─────────────────────────── */
     .container {
-      background: var(--card);
-      padding: 1.5rem;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-      width: 600px;
-      max-width: 90%;
-      margin: 1rem auto;
-      display: grid;
-      grid-template-columns: 1fr;
-      grid-gap: 1rem;
-      max-height: calc(100vh - 2rem);
+      display: flex;
+      flex-direction: column;
+      padding: 1rem;
+      box-sizing: border-box;
+      width: 100%;
     }
 
+    /* ── HEADER (TITLE + SETTINGS) ─────────────────────────────────────────── */
     .header {
       display: flex;
-      align-items: center;
       justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
     }
 
-    h2 {
+    .header h2 {
       margin: 0;
+      font-size: 1.25rem;
       color: var(--accent);
-      font-size: 1.5rem;
+      flex: 1;
     }
 
     .settings-btn {
@@ -59,134 +65,170 @@
       color: var(--text);
       font-size: 1.2rem;
       cursor: pointer;
-      padding: 0;
+      margin-left: 0.5rem;
     }
 
-    .settings-btn:hover {
-      color: var(--accent);
-    }
-
+    /* ── SCREENSHOT/ANNOTATION CANVAS ──────────────────────────────────────── */
     .screenshot-container {
+      background: var(--field-bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
       display: flex;
       justify-content: center;
       align-items: center;
-      background: var(--field-bg);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 0.5rem;
+      margin-bottom: 1rem;
       max-height: 256px;
+      /* Constrain vertical space to 256px */
+      overflow: hidden;
+      /* Clip any overflow beyond 256px */
     }
 
-    .screenshot-container img {
+    .screenshot-container canvas {
       max-height: 256px;
+      /* Keep canvas scaled to fit within 256px height */
       width: auto;
-      cursor: pointer;
+      /* Maintain canvas aspect ratio */
       border-radius: 4px;
-    }
-
-    .field {
-      margin-bottom: 0.75rem;
-    }
-
-    label {
+      cursor: crosshair;
+      /* Indicate user can draw */
+      background: #000;
+      /* Fallback background */
       display: block;
-      margin-bottom: 0.25rem;
-      font-weight: 500;
     }
 
-    input[type="text"],
-    select,
-    textarea {
+    /* ── GENERIC FIELD STYLING (INPUT, TEXTAREA, SELECT) ───────────────────── */
+    .field {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 0.9rem;
       width: 100%;
-      background: var(--field-bg);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 0.5rem;
+    }
+
+    .field label {
+      margin-bottom: 0.3rem;
+      font-weight: bold;
       color: var(--text);
       font-size: 0.9rem;
     }
 
-    input[type="text"] {
-      height: 2rem;
+    .field input,
+    .field textarea,
+    .field select {
+      padding: 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--field-bg);
+      color: var(--text);
+      font-size: 0.9rem;
+      box-sizing: border-box;
+      width: 100%;
     }
 
-    textarea {
+    .field select {
+      width: 20%;
+    }
+
+    .field input::placeholder,
+    .field textarea::placeholder {
+      color: #888;
+    }
+
+    .field textarea {
       resize: vertical;
-      min-height: 120px;
+      /* Allow vertical resizing only */
+      overflow: visible;
+      /* Show full content, no internal scroll */
     }
 
+    /* ── DYNAMIC META FIELDS CONTAINER ───────────────────────────────────── */
+    #meta-fields {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+
+    /* ── BUTTONS ROW ───────────────────────────────────────────────────────── */
     .buttons {
       display: flex;
-      justify-content: space-between;
-      gap: 0.5rem;
-      margin-top: 0.5rem;
+      justify-content: flex-start;
+      margin-top: 1rem;
+      margin-bottom: 1rem;
+      width: 100%;
     }
 
-    button.submit {
-      flex: 1;
-      padding: 0.6rem;
+    .buttons button {
+      background-color: var(--btn-bg);
       border: none;
-      border-radius: 6px;
-      background: var(--btn-bg);
+      border-radius: 4px;
       color: #fff;
-      font-size: 0.9rem;
       cursor: pointer;
-      transition: background 0.2s;
+      font-size: 0.9rem;
+      padding: 0.5rem 1rem;
+      transition: background 0.2s ease;
     }
 
-    button.submit:hover {
-      background: var(--btn-hover);
+    .buttons button:hover {
+      background-color: var(--btn-hover);
     }
 
+    /* ── DEBUG LOG (BOTTOM) ────────────────────────────────────────────────── */
     .debug-log {
       font-family: monospace;
       font-size: 0.75rem;
       line-height: 1.2;
       background: var(--field-bg);
       padding: 0.5rem;
-      height: 80px;
       border-radius: 4px;
       border: 1px solid var(--border);
+      overflow-y: auto;
+      max-height: 80px;
+      /* Scroll only if logs exceed 80px */
+      color: #aaa;
     }
   </style>
 </head>
 
 <body>
   <div class="container">
+    <!-- 1) HEADER: Title + Settings Cog -->
     <div class="header">
       <h2>Create Jira Issue</h2>
       <button id="settings" class="settings-btn" title="Settings">&#9881;</button>
     </div>
 
-    <!-- Screenshot display -->
+    <!-- 2) SCREENSHOT + ANNOTATION CANVAS -->
     <div class="screenshot-container">
-      <img id="screenshot" src="" alt="Captured screenshot" />
+      <canvas id="annotation-canvas"></canvas>
     </div>
 
-    <!-- Summary field -->
+    <!-- 3) SUMMARY FIELD -->
     <div class="field">
       <label for="summary">Summary</label>
       <input id="summary" type="text" placeholder="One-line issue summary" />
     </div>
 
-    <!-- Description textarea -->
+    <!-- 4) DESCRIPTION FIELD (auto-generated, editable) -->
     <div class="field">
       <label for="description">Description (auto-generated, editable)</label>
-      <textarea id="description" rows="6"></textarea>
+      <textarea id="description" rows="6" placeholder="Loading..."></textarea>
     </div>
 
-    <!-- ===== DYNAMIC META FIELDS HERE ===== -->
+    <!-- 5) DYNAMIC META FIELDS (picklists populated at runtime) -->
     <div id="meta-fields"></div>
 
+    <!-- 6) SUBMIT BUTTON -->
     <div class="buttons">
-      <button id="submit" class="submit">Submit</button>
+      <button id="submit">Submit</button>
     </div>
 
+    <!-- 7) DEBUG LOG (scrollable up to 80px) -->
     <div id="debug" class="debug-log">
       <strong>Debug Log:</strong><br>
     </div>
   </div>
 
+  <!-- 8) Include the popup logic -->
   <script type="module" src="popup.mjs"></script>
 </body>
 
