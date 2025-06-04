@@ -11,10 +11,10 @@
     "downloads"
   ],
   "host_permissions": [
-    "https://qbiq.atlassian.net/*"
+    "https://your-domain.atlassian.net/*"
   ],
   "matches": [
-      "*://*.qbiqarch.com/*"
+      "*://*.your-web-aaplication.com/*"
     ],
   "action": {
     "default_icon": "icons/icon.png"
@@ -24,7 +24,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://*.qbiqarch.com/*"],
+      "matches": ["https://*.your-web-aaplication.com/*"],
       "js": ["content_script.js"],
       "run_at": "document_start"
     }
