@@ -96,6 +96,17 @@
       display: block;
     }
 
+
+    .screenshot-container.expanded {
+      max-height: none !important;
+    }
+
+    .screenshot-container.expanded canvas {
+      max-height: none !important;
+      /* Optionally give it a larger width, e.g.: */
+      width: 100% !important;
+    }
+
     /* ── GENERIC FIELD STYLING (INPUT, TEXTAREA, SELECT) ───────────────────── */
     .field {
       display: flex;

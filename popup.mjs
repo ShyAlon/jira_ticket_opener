@@ -24,29 +24,71 @@ async function initPopup() {
   const canvas = document.getElementById('annotation-canvas');
   const ctx = canvas.getContext('2d');
 
+  // We'll keep a reference to the loaded Image so we can redraw if we resize the canvas
+  let loadedImage = null;
+
   if (issueData?.screenshot) {
-    const img = new Image();
-    img.onload = () => {
+    loadedImage = new Image();
+    loadedImage.onload = () => {
       const MAX_HEIGHT = 256;
-      let drawWidth = img.width;
-      let drawHeight = img.height;
-      if (img.height > MAX_HEIGHT) {
-        const ratio = MAX_HEIGHT / img.height;
+      let drawWidth = loadedImage.width;
+      let drawHeight = loadedImage.height;
+      if (loadedImage.height > MAX_HEIGHT) {
+        const ratio = MAX_HEIGHT / loadedImage.height;
         drawHeight = MAX_HEIGHT;
-        drawWidth = img.width * ratio;
+        drawWidth = loadedImage.width * ratio;
       }
+      // Set internal canvas resolution:
       canvas.width = drawWidth;
       canvas.height = drawHeight;
-      ctx.drawImage(img, 0, 0, drawWidth, drawHeight);
+      // Draw the image scaled into that internal resolution:
+      ctx.drawImage(loadedImage, 0, 0, drawWidth, drawHeight);
+      // Enable drawing (with coordinate‐scaling)
       enableFreehandDrawing(canvas, ctx);
     };
-    img.src = issueData.screenshot;
+    loadedImage.src = issueData.screenshot;
   } else {
+    // No screenshot: blank canvas
     canvas.width = 300;
     canvas.height = 200;
     ctx.fillStyle = '#2e2e2e';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    enableFreehandDrawing(canvas, ctx);
   }
+
+  // 2b) Handle double-click → toggle “expanded” on .screenshot-container
+  canvas.addEventListener('dblclick', () => {
+    const container = document.querySelector('.screenshot-container');
+    if (!container) return;
+    container.classList.toggle('expanded');
+
+    // If we have a loadedImage, and we just expanded (container now has .expanded),
+    // we want to resize the canvas to the image’s natural dimensions.
+    if (loadedImage) {
+      if (container.classList.contains('expanded')) {
+        // Expanded: set canvas to natural size
+        canvas.width = loadedImage.naturalWidth;
+        canvas.height = loadedImage.naturalHeight;
+      } else {
+        // Collapsed: scale back to max‐256px height
+        const MAX_HEIGHT = 256;
+        let w = loadedImage.naturalWidth;
+        let h = loadedImage.naturalHeight;
+        if (h > MAX_HEIGHT) {
+          const ratio = MAX_HEIGHT / h;
+          h = MAX_HEIGHT;
+          w = w * ratio;
+        }
+        canvas.width = w;
+        canvas.height = h;
+      }
+      // Redraw the image into the new internal resolution
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height);
+      // Keep the existing drawn strokes if you want—here we assume a fresh redraw
+      // If you need to preserve user‐drawn lines, you must store them and redraw them here.
+    }
+  });
 
   // 3) Auto-generate description (bullets + logs)
   const currentTabUrl = issueData?.url || '';
@@ -115,15 +157,12 @@ async function initPopup() {
     const fullDescription = descEl.value.trim();
 
     // 7) Collect dynamic fields into an object
-    //    For single-select: { fieldKey: { id: ... } }
-    //    For multi-select:  { fieldKey: [ { id: ... }, { id: ... }, ... ] }
     const dynamicFields = {};
     document.querySelectorAll('#meta-fields select[data-fieldkey]').forEach((sel) => {
       const fieldKey = sel.dataset.fieldkey;
       const isMulti = sel.dataset.isMulti === 'true';
 
       if (isMulti) {
-        // Gather all selected option values
         const values = Array.from(sel.selectedOptions).map((opt) => opt.value);
         if (values.length) {
           dynamicFields[fieldKey] = values.map((id) => ({ id }));
@@ -176,15 +215,6 @@ function buildDescription({ feVersion, beVersion, environment, currentTabUrl, is
 
 /**
  * populateAllMetaFields(json):
- *   1) Locate project → issuetype “Bug” → fields (an object mapping fieldKey→fieldObj)
- *   2) For each fieldKey whose fieldObj.allowedValues is a non-empty array:
- *       a) Create a <div class="field">
- *       b) Append a <label> with text fieldObj.name (for=fieldKey)
- *       c) Create a <select id=fieldKey data-fieldkey=fieldKey>
- *       d) If fieldObj.schema.type === "array", set select.multiple = true and data-is-multi="true"
- *       e) For each allowedValue in fieldObj.allowedValues, append <option value=allowedValue.id>allowedValue.name</option>
- *       f) Append the select to the wrapper and wrapper to #meta-fields
- *   3) If no picklist fields found, show a single <p>No picklist fields available.</p>
  */
 function populateAllMetaFields(json) {
   const container = document.getElementById('meta-fields');
@@ -210,7 +240,7 @@ function populateAllMetaFields(json) {
       sel.id = fieldKey;
       sel.dataset.fieldkey = fieldKey;
 
-      // If fieldObj.schema.type === "array", allow multiple selection
+      // If multi-select, set multiple and data-is-multi="true"
       if (fieldObj.schema?.type === 'array') {
         sel.multiple = true;
         sel.dataset.isMulti = 'true';
@@ -242,17 +272,24 @@ function populateAllMetaFields(json) {
 
 /**
  * enableFreehandDrawing(canvas, ctx):
- *   Attaches mouse/touch events so the user can draw freehand on the canvas.
+ *   Modified getCoords(evt) to account for CSS scaling.
  */
 function enableFreehandDrawing(canvas, ctx) {
   let drawing = false;
   let lastX = 0, lastY = 0;
 
   function getCoords(evt) {
+    // Get bounding rectangle of the canvas in CSS pixels
     const rect = canvas.getBoundingClientRect();
+    // Calculate CSS‐space coordinates
+    const cssX = evt.clientX - rect.left;
+    const cssY = evt.clientY - rect.top;
+    // Now convert CSS coords to the internal pixel coords by scaling
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
     return {
-      x: evt.clientX - rect.left,
-      y: evt.clientY - rect.top
+      x: cssX * scaleX,
+      y: cssY * scaleY
     };
   }
 
