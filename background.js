@@ -1,5 +1,4 @@
 // background.js
-
 console.log('[Background] Service worker loaded');
 
 /**
@@ -8,10 +7,9 @@ console.log('[Background] Service worker loaded');
  *   1) Focus & activate the target tab
  *   2) Wait until it’s active
  *   3) Capture a screenshot (PNG) from that tab’s window
- *   4) Download the PNG for debugging
- *   5) Request console logs from content_script.js (if present)
- *   6) Store { url, screenshot, logs, tabId } in chrome.storage.local
- *   7) Open popup.html in a new tab
+ *   4) Request console logs from content_script.js (if present)
+ *   5) Store { url, screenshot, logs, tabId } in chrome.storage.local
+ *   6) Open popup.html in a new tab
  */
 chrome.action.onClicked.addListener((tab) => {
   console.log('[Background] Icon clicked. Tab info:', tab);
@@ -67,7 +65,7 @@ function attemptCapture(tab) {
 }
 
 /**
- * Capture the visible tab, download for debugging, request logs,
+ * Capture the visible tab, request logs,
  * store issueData (including tabId), and open popup.html.
  */
 function doCapture(tab) {
@@ -78,30 +76,8 @@ function doCapture(tab) {
     }
     console.log('[Background] Screenshot captured (length:', dataUrl.length, ')');
 
-    // ── DEBUG: Download the captured image ───────────────────────────────────────
-    console.log('[Background] About to download screenshot for debugging…');
-    chrome.downloads.download({
-      url: dataUrl,
-      filename: 'jira-debug-screenshot.png',
-      conflictAction: 'overwrite'
-    }, (downloadId) => {
-      if (chrome.runtime.lastError) {
-        console.error('[Background] Download failed:', chrome.runtime.lastError.message);
-      } else {
-        console.log('[Background] Download initiated, id=', downloadId);
-        chrome.downloads.onChanged.addListener((delta) => {
-          if (delta.id === downloadId) {
-            if (delta.state && delta.state.current === 'complete') {
-              console.log('[Background] Download completed successfully.');
-            } else if (delta.error) {
-              console.error('[Background] Download error:', delta.error.current);
-            }
-          }
-        });
-      }
-    });
-    console.log('[Background] Called chrome.downloads.download()');
-    // ── END DEBUG DOWNLOAD ────────────────────────────────────────────────────
+    // ── NO MORE: chrome.downloads.download(...) ─────────────────────────────────
+    // We no longer download to the user's folder. Instead, keep the PNG in memory/storage.
 
     // 3) Request console logs from content script
     chrome.tabs.sendMessage(tab.id, 'getConsoleLogs', (logs) => {
@@ -116,10 +92,10 @@ function doCapture(tab) {
 
       // 4) Store issueData (url, screenshot, logs, tabId) in local storage
       const issueData = {
-        url:        tab.url,
+        url: tab.url,
         screenshot: dataUrl,
-        logs:       logs,
-        tabId:      tab.id
+        logs: logs,
+        tabId: tab.id
       };
       chrome.storage.local.set({ issueData }, () => {
         if (chrome.runtime.lastError) {
@@ -154,18 +130,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     loadMetadataInBackground()
       .then((data) => sendResponse({ success: true, data }))
       .catch((err) => sendResponse({ success: false, error: err.message }));
-    return true;
+    return true; // Keep the message channel open for sendResponse
   }
 });
 
 /**
  * Perform the Jira API call to fetch create-meta for the given project & issue type.
  * This runs in the background service-worker (no CORS issues, since we’ve granted host_permissions).
- * We also compute and persist sysFieldKey.
  */
-
 async function loadMetadataInBackground() {
-  // (1) Read email/token/host/projectKey exactly as you already do
+  // (1) Read email/token/host/projectKey from storage  [oai_citation:0‡background.js](file-service://file-Wac6VDrZ3GRtUE85ojAHJs)
   const { email, token, host, projectKey } =
     await chrome.storage.sync.get(['email', 'token', 'host', 'projectKey']);
   if (!email || !token || !host || !projectKey) {
@@ -175,17 +149,17 @@ async function loadMetadataInBackground() {
   // (2) Fetch create-meta
   const auth = btoa(`${email}:${token}`);
   const url = `https://${host}/rest/api/2/issue/createmeta`
-            + `?projectKeys=${encodeURIComponent(projectKey)}`
-            + `&issuetypeNames=Bug&expand=projects.issuetypes.fields`;
+    + `?projectKeys=${encodeURIComponent(projectKey)}`
+    + `&issuetypeNames=Bug&expand=projects.issuetypes.fields`;
   const resp = await fetch(url, {
     headers: {
       'Authorization': `Basic ${auth}`,
-      'Accept':        'application/json'
+      'Accept': 'application/json'
     }
   });
   if (!resp.ok) {
     const txt = await resp.text().catch(() => '<no body>');
     throw new Error(`Jira create-meta error ${resp.status}: ${txt}`);
   }
-  return resp.json(); // <-- send the full JSON back to the popup
+  return resp.json(); // Send the full JSON back to the popup  [oai_citation:1‡background.js](file-service://file-Wac6VDrZ3GRtUE85ojAHJs)
 }
